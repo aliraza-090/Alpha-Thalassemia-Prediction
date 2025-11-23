@@ -44,25 +44,35 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------- HELPER FUNCTION ----------------------
-def display_result(pred, model_name):
+# ---------------------- HELPER FUNCTIONS ----------------------
+def display_result(pred):
+    """Display simplified prediction result only."""
     if pred == 0:
         st.markdown(f"""
             <div class="result-box" style="background-color:#388e3c; color:#fff;">
-                🟢 <b>Result ({model_name}): You are healthy (Normal)</b><br>
-                Your blood parameters are within normal range.
+                🟢 Normal
             </div>
         """, unsafe_allow_html=True)
     else:
         st.markdown(f"""
-            <div class="result-box" style="background-color:#d32f2f; color:#fff;">
-                🔴 <b>Result ({model_name}): Alpha-Thalassemia Carrier</b><br>
-                You may carry the Alpha-Thalassemia trait. Please consult your doctor for confirmation.
+            <div class="result-box" style="background-color:#ffa726; color:#fff;">
+                ⚠️ Alpha-Thalassemia Carrier
             </div>
         """, unsafe_allow_html=True)
 
 # ---------------------- HOME PAGE ----------------------
 if st.session_state.page == 'home':
+    # Introduction
+    st.markdown("""
+    <h2 style='text-align:center; color:#ffcc80; font-size:36px;'>
+        Welcome to Alpha-Thalassemia Prediction
+    </h2>
+    <p style='text-align:center; color:#ffffff; font-size:18px;'>
+        This tool predicts Alpha-Thalassemia carrier status based on blood parameters.
+        Use this as an informational tool; consult your doctor for confirmation.
+    </p>
+    """, unsafe_allow_html=True)
+
     st.markdown('<p class="title-style">Alpha-Thalassemia Prediction</p>', unsafe_allow_html=True)
 
     # Load CSV
@@ -71,11 +81,13 @@ if st.session_state.page == 'home':
     df = df.dropna().reset_index(drop=True)
     df['phenotype'] = df['phenotype'].str.strip().str.lower().map({
         'normal':0, 'alpha carrier':1,'alpha_carrier':1,'alpha-carrier':1,'carrier':1}).astype(int)
-    if 'sex' in df.columns: df['sex'] = df['sex'].str.lower().map({'male':1,'female':0}).fillna(0).astype(int)
+    if 'sex' in df.columns:
+        df['sex'] = df['sex'].str.lower().map({'male':1,'female':0}).fillna(0).astype(int)
+    
     X = df.select_dtypes(include=[np.number]).drop(columns=['phenotype'])
     y = df['phenotype']
 
-    # Scale + balance
+    # Scaling + balance
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
     sm = SMOTE(random_state=42)
@@ -87,7 +99,7 @@ if st.session_state.page == 'home':
     rf.fit(X_bal, y_bal)
     xgb.fit(X_bal, y_bal)
 
-    # Sidebar Inputs
+    # Sidebar input
     st.sidebar.header("Enter Patient Details")
     st.sidebar.write("### 🔹 Gender Input Guide")
     st.sidebar.write("✔ Enter 1 = Male, 0 = Female")
@@ -101,32 +113,38 @@ if st.session_state.page == 'home':
     # Prediction Buttons
     if st.sidebar.button("Predict with RandomForest"):
         pred = rf.predict(input_scaled)[0]
-        display_result(pred, "RandomForest")
+        display_result(pred)
     if st.sidebar.button("Predict with XGBoost"):
         pred = xgb.predict(input_scaled)[0]
-        display_result(pred, "XGBoost")
+        display_result(pred)
 
     st.write("✅ Models trained and ready to predict!")
 
-    # AI Chat Button
+    # AI Chat button
     if st.button("💬 Chat with AI Consultant", key="ai_chat"):
         st.session_state.page = 'chat'
 
 # ---------------------- CHAT PAGE ----------------------
 if st.session_state.page == 'chat':
     st.markdown('<p class="title-style">AI Health Consultant</p>', unsafe_allow_html=True)
-    st.info("Ask any question regarding symptoms, blood results, or health concerns. The AI will provide advice based on your input.")
+    st.info("Ask questions only about Alpha-Thalassemia or CBC test results.")
 
-    # Chat Input
+    # Chat input
     chat_input = st.text_input("Type your question here...", key="chat_input")
     send = st.button("Send 🡆")
 
     if send and chat_input.strip():
-        symptom_keywords = ['pain','fever','blood','hb','rbc','mcv','mch','mchc','thalasemia','carrier','fatigue','weakness']
-        if any(word in chat_input.lower() for word in symptom_keywords):
-            ai_response = f"Based on your input: '{chat_input}', the AI suggests monitoring your symptoms and consulting a doctor. Regular checkups are recommended."
+        keywords = ['thalassemia', 'alpha', 'cbc', 'hb', 'rbc', 'mcv', 'mch', 'mchc', 'rdw', 'wbc', 'plt', 'hba', 'hba2', 'hbf']
+        if any(word in chat_input.lower() for word in keywords):
+            ai_response = (
+                f"Based on your input: '{chat_input}', here is some advice:\n"
+                "- Monitor your blood parameters regularly.\n"
+                "- Alpha-Thalassemia carriers should do regular CBC tests.\n"
+                "- Consult a hematologist for confirmation.\n"
+                "- Maintain a healthy diet and hydration."
+            )
         else:
-            ai_response = "Sorry, I can only answer health-related questions. Please ask about symptoms or blood results."
+            ai_response = "Sorry, I can only answer questions about Alpha-Thalassemia or CBC tests."
 
         st.session_state.chat_history.append({"role":"user","message":chat_input})
         st.session_state.chat_history.append({"role":"ai","message":ai_response})
